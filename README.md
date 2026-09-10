@@ -45,7 +45,7 @@ Copie `.env.example` para `.env.local`. Nenhuma variável é obrigatória:
 
 ## Deploy
 
-PWA na Vercel (branch `front`) e API + MySQL no Railway (branch `back`). Passo a passo, variáveis e as armadilhas de CORS e de volume em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Tudo no Railway, num projeto só com três serviços: MySQL, API (Root Directory `backend`) e PWA (raiz). Passo a passo, variáveis, domínio próprio e as armadilhas de CORS e de volume em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## O que já funciona (Fase 1)
 
