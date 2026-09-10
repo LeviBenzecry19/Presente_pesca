@@ -1,148 +1,134 @@
 # Deploy
 
-Tudo no Railway, num projeto só, com **três serviços**:
+Tudo no Railway, num projeto só (`wonderful-adaptation`), com **três recursos**:
 
-| Serviço | Root Directory | Watch Paths      | Config                                     |
-| ------- | -------------- | ---------------- | ------------------------------------------ |
-| MySQL   | —              | —                | serviço pronto do Railway                  |
-| API     | `backend`      | `backend/**`     | [`backend/railway.json`](../backend/railway.json) |
-| PWA     | `.` (raiz)     | veja abaixo      | [`railway.json`](../railway.json)          |
+| Recurso         | O que é              | Root Directory | Fonte da configuração                |
+| --------------- | -------------------- | -------------- | ------------------------------------ |
+| `Presente_pesca`| PWA (Next.js)        | `.` (raiz)     | [`.railway/railway.ts`](../.railway/railway.ts) |
+| `api`           | API (Symfony + Apache) | `backend`    | idem                                 |
+| `MySQL`         | banco                | —              | idem                                 |
 
 Os dois serviços de código saem da **mesma branch `main`**; o que os separa é o
 Root Directory. É de propósito: o contrato de sincronização vive metade em
 `src/lib/db/schema.ts` e metade em `backend/src/Dto/`, e manter uma história só
-permite mudar os dois lados no mesmo commit.
+permite mudar os dois lados no mesmo commit. Os *watch paths* evitam que um
+commit no backend reconstrua o PWA e vice-versa.
 
-Cada serviço tem um domínio próprio (o Railway não faz roteamento por caminho
-entre serviços), então o desenho final é `app.seudominio.com` para o PWA e
-`api.seudominio.com` para a API.
+Cada serviço tem o domínio dele — o Railway não roteia por caminho entre
+serviços:
 
-**Ordem importa:** MySQL → API → domínio da API → PWA → CORS. A URL da API é
-embutida no bundle do PWA em tempo de build; subir o PWA antes de saber a URL
-significa refazer o deploy depois.
+- PWA: <https://presentepesca-production.up.railway.app>
+- API: <https://api-production-7d6ad.up.railway.app>
 
-## 1. MySQL
+## A infraestrutura é código
 
-Adicione um serviço **MySQL**, não Postgres. As migrations foram geradas para
-MySQL e usam `LONGTEXT`, `TINYINT` e `DEFAULT CHARACTER SET utf8mb4`; em
-Postgres elas falham na primeira linha. O volume de dados já vem junto com o
-serviço.
-
-## 2. API (Symfony)
-
-Serviço a partir do repositório, branch `main`, **Root Directory `backend`** — é
-esse campo que faz o Railway achar o [`railway.json`](../backend/railway.json)
-de lá, que manda usar o Dockerfile e configura o healthcheck em `/v1/health`
-(só responde 200 quando o banco também responde).
-
-**Volume.** Monte um volume em `/data`. Sem isso as fotos das capturas somem a
-cada deploy — o disco do container é efêmero.
-
-**Variáveis:**
-
-| Variável                | Valor                                                              |
-| ----------------------- | ------------------------------------------------------------------ |
-| `APP_ENV`               | `prod`                                                             |
-| `APP_SECRET`            | um valor novo (veja abaixo) — não reaproveite o de desenvolvimento |
-| `DATABASE_URL`          | `${{MySQL.MYSQL_URL}}?serverVersion=8.0&charset=utf8mb4`            |
-| `CORS_ALLOW_ORIGIN`     | por enquanto `^https://.*\.up\.railway\.app$`; vira o domínio real no passo 4 |
-| `PESCA_PHOTO_DIR`       | `/data/photos`                                                     |
-| `PESCA_MAX_PHOTO_BYTES` | `8388608`                                                          |
-
-`APP_SECRET` novo:
+`.railway/railway.ts` descreve o projeto inteiro: serviços, banco, volume,
+variáveis, região, healthcheck e watch paths. Não configure nada pelo painel —
+o arquivo é diffado contra o ambiente ao vivo e o painel perde na próxima
+aplicação.
 
 ```bash
-php -r "echo bin2hex(random_bytes(16)), PHP_EOL;"
+npm install                # o SDK "railway" é devDependency do projeto
+npm install -g @railway/cli
+railway login
+railway link --project <id> --environment <id> --service <id>
+
+railway config plan        # mostra o diff; não muda nada
+railway config apply       # aplica (--yes para não perguntar)
 ```
 
-Sobre `DATABASE_URL`: o nome exato da variável do serviço MySQL aparece na aba
-Variables do Railway — costuma ser `MYSQL_URL` (rede interna, sem passar pela
-internet). Ajuste `serverVersion` para a versão que o painel mostrar. O sufixo
-importa: sem `serverVersion` o Doctrine abre uma conexão extra só para descobrir
-a versão, e sem `charset=utf8mb4` os nomes com acento chegam quebrados.
+`plan` limpo (`0 to add, 0 to change, 0 to destroy`) significa que o Railway
+está igual ao arquivo. Mudanças destrutivas — remover recurso ou variável,
+mover o banco de região — exigem `--confirm-destructive` além do `--yes`.
 
-Sobre `CORS_ALLOW_ORIGIN`: é **regex**, não URL literal (`origin_regex: true` em
-`config/packages/nelmio_cors.yaml`). Escape os pontos e ancore com `^…$`, senão
-`meuapp.com.invasor.com` também passa. O default versionado em `backend/.env` só
-aceita `localhost` — sem sobrescrever aqui, o navegador bloqueia todas as
-chamadas do PWA.
+**No Windows**, `railway config plan` pode falhar com *"requires Railway CLI
+5.42.1 or newer"* mesmo com a CLI nova: a checagem roda
+`execFileSync(process.env._ || "railway")`, e o `railway.cmd` instalado pelo npm
+não é executável direto. Contorne apontando `_` para o binário:
 
-Quando o serviço subir, gere o domínio público (Settings → Networking →
-Generate Domain) e anote a URL: ela é a entrada do próximo passo.
-
-## 3. PWA (Next.js)
-
-Outro serviço, mesmo repositório, mesma branch, **Root Directory na raiz**. O
-[`railway.json`](../railway.json) da raiz define `npm run build` (que dispara o
-`prebuild` e gera `public/sw.js`) e `npm run start`; o `next start` escuta o
-`$PORT` que o Railway injeta, sem precisar de flag. O `.nvmrc` fixa o Node 22 —
-sem ele o builder escolhe a versão do dia.
-
-**Watch Paths.** Sem isso, todo commit reconstrói os dois serviços. No PWA:
-
-```
-/**
-!/backend/**
-!/docs/**
+```powershell
+$env:_ = "$env:APPDATA\npm\node_modules\@railway\cli\bin\railway.exe"
 ```
 
-**Variáveis:**
+O `railway.json` (Config as Code) foi **descontinuado** pelo Railway e para de
+funcionar em 2026-12-01 — por isso os dois que existiam aqui foram removidos.
 
-| Variável                    | Valor                                    |
-| --------------------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_SYNC_ENDPOINT` | URL pública da API, sem barra no fim      |
-| `NEXT_PUBLIC_APP_CONTACT`   | e-mail de contato para o Nominatim        |
+## Segredos: fora do git
 
-`NEXT_PUBLIC_*` é **embutido no bundle em tempo de build**. Mudar a URL da API
-depois exige um redeploy; editar a variável sozinha não muda nada no app que já
-está no ar. Dá para escrever `https://${{API.RAILWAY_PUBLIC_DOMAIN}}` (trocando
-`API` pelo nome do serviço) e deixar o Railway resolver, mas assim que houver
-domínio próprio prefira a URL literal — a variável de referência continua
-apontando para o `*.up.railway.app`.
+Duas variáveis ficam como `preserve()` no arquivo, ou seja, o valor vive só no
+Railway:
 
-O `NEXT_PUBLIC_APP_CONTACT` não é decorativo: a política de uso do Nominatim
-exige um contato identificável, e sem ele a busca por endereço pode ser
-bloqueada.
+```bash
+# Um valor novo, nunca o de desenvolvimento.
+railway variables --set "APP_SECRET=$(php -r 'echo bin2hex(random_bytes(16));')" --service api
 
-## 4. Domínio próprio
+# Contato exigido pela política de uso do Nominatim. Vai parar no bundle
+# público do PWA, então prefira um endereço de projeto ao seu pessoal.
+railway variables --set "NEXT_PUBLIC_APP_CONTACT=contato@exemplo.com" --service Presente_pesca
+```
 
-Em cada serviço: Settings → Networking → Custom Domain. O Railway devolve um
-alvo CNAME e emite o certificado sozinho depois que o DNS propaga.
+O resto das variáveis está versionado em `.railway/railway.ts`. Duas merecem
+explicação:
 
-| Registro         | Tipo  | Aponta para                    |
-| ---------------- | ----- | ------------------------------ |
-| `app`            | CNAME | alvo mostrado no serviço do PWA |
-| `api`            | CNAME | alvo mostrado no serviço da API |
+- **`DATABASE_URL`** = `${{MySQL.MYSQL_URL}}?serverVersion=8.0&charset=utf8mb4`.
+  Sem `serverVersion` o Doctrine abre uma conexão extra só para descobrir a
+  versão; sem `charset=utf8mb4` os nomes com acento chegam quebrados.
+- **`CORS_ALLOW_ORIGIN`** é **regex**, não URL literal (`origin_regex: true` em
+  `config/packages/nelmio_cors.yaml`). Escape os pontos e ancore com `^…$`,
+  senão `presentepesca-production.up.railway.app.invasor.com` também passa. O
+  default versionado em `backend/.env` só aceita `localhost`.
+
+E `NEXT_PUBLIC_SYNC_ENDPOINT` = `https://${{api.RAILWAY_PUBLIC_DOMAIN}}`: o
+Railway resolve a referência, mas **`NEXT_PUBLIC_*` é embutido no bundle em
+tempo de build**. Mudou a URL da API, o PWA precisa de um redeploy — editar a
+variável sozinha não muda nada no app que já está no ar.
+
+## Volume e região
+
+As fotos das capturas ficam no volume `fotos`, montado em `/data` no serviço da
+API (`PESCA_PHOTO_DIR=/data/photos`). Sem ele, cada deploy zeraria as fotos: o
+disco do container é efêmero.
+
+Tudo roda em **US East** (`us-east4-eqdc4a`) — não existe região na América do
+Sul, e é a mais próxima do Brasil. Banco, API e volume na mesma região não é
+detalhe: cada consulta atravessaria o Atlântico se o MySQL ficasse na Europa.
+Mover o banco de região recria o volume, então é decisão de começo de projeto.
+
+## Domínio próprio
+
+Em cada serviço: `railway domain seudominio.com --service <serviço>` (ou
+Settings → Networking no painel). O Railway devolve o alvo CNAME e emite o
+certificado quando o DNS propaga.
+
+| Registro | Tipo  | Aponta para                     |
+| -------- | ----- | ------------------------------- |
+| `app`    | CNAME | alvo mostrado no serviço do PWA |
+| `api`    | CNAME | alvo mostrado no serviço da API |
 
 Detalhes que costumam travar:
 
-- **Domínio raiz** (`seudominio.com`, sem subdomínio) só funciona se o seu DNS
-  suportar ALIAS/ANAME ou CNAME flattening — Cloudflare e Registro.br não se
-  comportam igual aqui. Subdomínio é sempre o caminho mais curto.
-- **Cloudflare com proxy ligado** (nuvem laranja): deixe o SSL/TLS em *Full
-  (strict)*. Em *Flexible* dá loop de redirecionamento. Se o certificado do
-  Railway não sair, ponha em DNS only até validar e ligue o proxy depois.
+- **Domínio raiz** (`seudominio.com`) só funciona se o DNS suportar ALIAS/ANAME
+  ou CNAME flattening. Subdomínio é sempre o caminho mais curto.
+- **Cloudflare com proxy ligado**: SSL/TLS em *Full (strict)*. Em *Flexible* dá
+  loop de redirecionamento; se o certificado não sair, deixe em DNS only até
+  validar.
 - Domínio próprio exige plano pago; no trial só existe o `*.up.railway.app`.
 
-Com os domínios de pé, feche o ciclo:
+Depois de apontar o DNS, feche o ciclo em `.railway/railway.ts`:
 
-1. `CORS_ALLOW_ORIGIN` na API → `^https://app\.seudominio\.com$`
-2. `NEXT_PUBLIC_SYNC_ENDPOINT` no PWA → `https://api.seudominio.com`
-3. **Redeploy do PWA** — sem isso o bundle publicado continua chamando a URL
-   antiga.
-
-Se quiser que as pré-visualizações também sincronizem, o regex do CORS precisa
-cobrir os domínios de preview: `^https://(app\.seudominio\.com|.*\.up\.railway\.app)$`.
+1. `CORS_ALLOW_ORIGIN` → `^https://app\.seudominio\.com$`
+2. `NEXT_PUBLIC_SYNC_ENDPOINT` → `https://api.seudominio.com`
+3. `railway config apply` e **redeploy do PWA**.
 
 ## Conferindo
 
 ```bash
 # Banco de pé e migrations aplicadas.
-curl https://api.seudominio.com/v1/health
+curl https://api-production-7d6ad.up.railway.app/v1/health
 
 # CORS liberado para o domínio do PWA.
-curl -I -H "Origin: https://app.seudominio.com" \
-     https://api.seudominio.com/v1/health
+curl -I -H "Origin: https://presentepesca-production.up.railway.app" \
+     https://api-production-7d6ad.up.railway.app/v1/health
 ```
 
 O `/v1/health` devolve `ok: true` com a versão do MySQL quando está tudo certo,
@@ -152,12 +138,24 @@ procure `access-control-allow-origin` na resposta.
 No app: Ajustes mostra a fila de sincronização pendente. Se ela zera depois de
 registrar uma pescaria, os dois lados estão conversando.
 
+Logs, quando algo falha:
+
+```bash
+railway logs --service api --build        # build da imagem
+railway logs --service api --deployment   # container rodando
+```
+
 ## Como o container da API sobe
 
 [`backend/Dockerfile`](../backend/Dockerfile) é Apache + PHP 8.4 num processo
-só. O [`entrypoint.sh`](../backend/docker/entrypoint.sh) faz, nessa ordem:
+só. Duas armadilhas da imagem base já resolvidas ali: `php:8.4-apache` não traz
+`unzip` nem a extensão zip (sem um dos dois o `composer install` não extrai os
+pacotes) e não pode ficar com `mpm_prefork` e `mpm_event` carregados ao mesmo
+tempo — o Apache morre no boot com *"More than one MPM loaded"*.
 
-1. escreve `ports.conf` com o `$PORT` que o Railway injeta;
+O [`entrypoint.sh`](../backend/docker/entrypoint.sh) faz, nessa ordem:
+
+1. escreve `ports.conf` com o `$PORT` (fixado em 8080 nas variáveis);
 2. espera o banco aceitar conexão (até ~60s) antes de seguir;
 3. roda as migrations com `--allow-no-migration`, para que reiniciar sem
    migration nova não derrube o deploy;
@@ -166,10 +164,9 @@ só. O [`entrypoint.sh`](../backend/docker/entrypoint.sh) faz, nessa ordem:
    montagem do volume nasce do root e o Apache não escreveria nele;
 6. entrega o processo para o `apache2-foreground`.
 
-As migrations rodarem no boot é simples e suficiente para uma réplica só
-(`numReplicas: 1` no `railway.json`). Se um dia precisar escalar, duas réplicas
-subindo juntas tentariam migrar ao mesmo tempo — aí vale mover esse passo para
-um comando de release manual.
+As migrations rodarem no boot é simples e suficiente para uma réplica só. Se um
+dia precisar escalar, duas réplicas subindo juntas tentariam migrar ao mesmo
+tempo — aí vale mover esse passo para um comando de release manual.
 
 ## Fora do escopo
 

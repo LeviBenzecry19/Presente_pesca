@@ -36,7 +36,8 @@ export default defineRailway(() => {
       // Só responde 200 quando o banco também responde.
       healthcheckPath: "/v1/health",
       healthcheckTimeout: 120,
-      restartPolicyType: "ON_FAILURE",
+      // restartPolicyType fica de fora: ON_FAILURE já é o padrão do Railway,
+      // e declará-lo faz o plan nunca convergir (a API devolve null).
       restartPolicyMaxRetries: 5,
     },
     replicas: { [REGIAO]: 1 },
@@ -72,7 +73,8 @@ export default defineRailway(() => {
       startCommand: "npm run start",
       healthcheckPath: "/",
       healthcheckTimeout: 120,
-      restartPolicyType: "ON_FAILURE",
+      // restartPolicyType fica de fora: ON_FAILURE já é o padrão do Railway,
+      // e declará-lo faz o plan nunca convergir (a API devolve null).
       restartPolicyMaxRetries: 5,
     },
     replicas: { [REGIAO]: 1 },

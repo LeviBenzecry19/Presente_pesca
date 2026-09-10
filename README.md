@@ -45,7 +45,7 @@ Copie `.env.example` para `.env.local`. Nenhuma variável é obrigatória:
 
 ## Deploy
 
-Tudo no Railway, num projeto só com três serviços: MySQL, API (Root Directory `backend`) e PWA (raiz). Passo a passo, variáveis, domínio próprio e as armadilhas de CORS e de volume em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+Tudo no Railway, num projeto só com três recursos: MySQL, API (Root Directory `backend`) e PWA (raiz). A infraestrutura é código, em [`.railway/railway.ts`](.railway/railway.ts) — `railway config plan` mostra o diff, `railway config apply` aplica. Passo a passo, variáveis, domínio próprio e as armadilhas de CORS e de volume em [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## O que já funciona (Fase 1)
 
