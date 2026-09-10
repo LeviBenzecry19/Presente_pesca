@@ -43,4 +43,12 @@ esac
 
 chown -R www-data:www-data var
 
+# O Apache não sobe com dois MPMs carregados ("More than one MPM loaded") e o
+# PHP como módulo exige o prefork. A imagem já resolve isso no build, mas
+# repetir aqui é barato e é o único ponto que sobrevive a qualquer camada.
+echo "MPMs habilitados: $(ls -1 /etc/apache2/mods-enabled | grep '^mpm' | tr '\n' ' ')" >&2
+rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.*
+ln -sf ../mods-available/mpm_prefork.load /etc/apache2/mods-enabled/mpm_prefork.load
+ln -sf ../mods-available/mpm_prefork.conf /etc/apache2/mods-enabled/mpm_prefork.conf
+
 exec apache2-foreground

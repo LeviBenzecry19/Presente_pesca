@@ -27,6 +27,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 # a lista inteira quando um dos módulos não existe na imagem.
 RUN rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* \
  && a2enmod mpm_prefork rewrite headers \
+ && ls -1 /etc/apache2/mods-enabled/mpm_*.load \
+ && test "$(ls -1 /etc/apache2/mods-enabled/mpm_*.load | wc -l)" -eq 1 \
  && rm -f /etc/apache2/sites-enabled/000-default.conf \
  && : > /etc/apache2/ports.conf
 COPY docker/apache-symfony.conf /etc/apache2/sites-enabled/symfony.conf
