@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+# This file is the entry point to configure the routes of your app.
+# See also https://symfony.com/doc/current/service_container/import.html
+
+parameters:
+    app.photo_dir: '%env(resolve:PESCA_PHOTO_DIR)%'
+    app.max_photo_bytes: '%env(int:PESCA_MAX_PHOTO_BYTES)%'
+
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\:
+        resource: '../src/'
