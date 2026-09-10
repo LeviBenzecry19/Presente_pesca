@@ -7,7 +7,13 @@ FROM php:8.4-apache
 # pdo_mysql para o Doctrine e opcache porque em produção o código não muda
 # entre requisições. ctype, iconv e fileinfo (usado para checar o tipo real da
 # foto) já vêm habilitados na imagem base.
-RUN docker-php-ext-install -j"$(nproc)" pdo_mysql opcache
+#
+# unzip não é luxo: a imagem base não traz nem o binário nem a extensão zip do
+# PHP, e sem um dos dois o composer install falha ao extrair os pacotes dist.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends unzip \
+ && rm -rf /var/lib/apt/lists/* \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql opcache
 
 # Composer sai da imagem oficial: nada de baixar instalador durante o build.
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
