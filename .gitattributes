@@ -1,0 +1,3 @@
+# O entrypoint do container roda em Linux. Se o checkout no Windows convertesse
+# para CRLF, o shebang viraria "/bin/sh\r" e o container não subiria.
+*.sh text eol=lf

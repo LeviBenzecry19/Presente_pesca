@@ -1,0 +1,23 @@
+# O composer install roda dentro da imagem; o vendor/ local é de outra
+# plataforma (Windows) e só atrasaria o envio do contexto.
+vendor/
+
+# Cache, log e fotos de desenvolvimento.
+var/
+
+# Nada de teste vai para produção.
+tests/
+phpunit.xml
+phpunit.dist.xml
+.phpunit.cache/
+
+# Sobras da receita do Symfony: o banco de produção é o do Railway.
+compose.yaml
+compose.override.yaml
+
+# Segredos locais nunca entram na imagem — em produção as variáveis vêm do
+# painel do Railway, que tem precedência sobre qualquer arquivo .env.
+.env.local
+.env.*.local
+
+docker/README.md

@@ -43,13 +43,17 @@ Copie `.env.example` para `.env.local`. Nenhuma variável é obrigatória:
 
 `NEXT_PUBLIC_*` é embutido no bundle em tempo de build: depois de mudar, refaça `npm run build`.
 
+## Deploy
+
+PWA na Vercel (branch `front`) e API + MySQL no Railway (branch `back`). Passo a passo, variáveis e as armadilhas de CORS e de volume em [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## O que já funciona (Fase 1)
 
 - **Planejar**: data/hora, local por GPS, busca (Nominatim) ou toque no mapa (Leaflet + OSM), spots salvos, clima horário (Open-Meteo), fase da lua, previsão de pesca por heurísticas, lembrete.
 - **Spots**: CRUD de locais favoritos, ordenação por distância, "Pescar agora aqui".
 - **Sessão ativa**: iniciar/encerrar com GPS, "Pescar agora" sem planejamento, checklist.
 - **Capturas**: foto (câmera, comprimida), espécie (base curada filtrada por ambiente + "outra"), peso, tamanho, GPS automático com ajuste no mapa, isca, observações; edição e exclusão.
-- **Histórico**: pescarias concluídas e estatísticas (horas, capturas, maior peixe, espécies).
+- **Histórico**: pescarias concluídas e estatísticas (horas, capturas, maior peixe, espécies), agrupadas por mês, com busca, filtro por ano e uma aba só de fotos.
 - **Offline**: IndexedDB (Dexie), service worker com pré-cache das telas, fila de sincronização com Background Sync, backup/restauração em JSON.
 - **PWA**: manifest, ícones, instalação, atualização com aviso.
 - **Backend** (Symfony 8 + Doctrine + MySQL): sincronização em lote idempotente com resolução de conflito por `updatedAt`, upload de fotos, download incremental e agregação de espécies por região com consulta geoespacial.
