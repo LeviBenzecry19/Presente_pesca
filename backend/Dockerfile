@@ -20,7 +20,13 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 # Um único site, servido na porta que o Railway injetar. O ports.conf é escrito
 # pelo entrypoint, quando $PORT finalmente existe.
-RUN a2enmod rewrite headers \
+#
+# O a2dismod não é decorativo: com mpm_prefork e mpm_event carregados ao mesmo
+# tempo o Apache morre no boot com "More than one MPM loaded". O PHP como
+# módulo do Apache exige o prefork.
+RUN ls -1 /etc/apache2/mods-enabled | grep -i mpm; \
+    a2dismod mpm_event mpm_worker 2>/dev/null; \
+    a2enmod mpm_prefork rewrite headers \
  && rm -f /etc/apache2/sites-enabled/000-default.conf \
  && : > /etc/apache2/ports.conf
 COPY docker/apache-symfony.conf /etc/apache2/sites-enabled/symfony.conf

@@ -23,7 +23,7 @@ export default defineRailway(() => {
 
   // Sem volume, as fotos das capturas somem a cada deploy: o disco do
   // container é efêmero.
-  const fotos = volume("fotos", { region: REGIAO });
+  const fotos = volume("fotos", { region: REGIAO, sizeMB: 5000 });
 
   const api = service("api", {
     source: github(REPO, { branch: "main", rootDirectory: "backend", checkSuites: false }),
@@ -43,6 +43,9 @@ export default defineRailway(() => {
     volumeMounts: { "/data": fotos },
     env: {
       APP_ENV: "prod",
+      // Fixo em vez de deixar o Railway adivinhar: o entrypoint escreve o
+      // ports.conf do Apache com esse valor e o domínio aponta para ele.
+      PORT: "8080",
       // Valor fica só no Railway: railway variables --set "APP_SECRET=..." --service api
       APP_SECRET: preserve(),
       // Sem serverVersion o Doctrine abre uma conexão extra só para descobrir a
@@ -75,6 +78,8 @@ export default defineRailway(() => {
     replicas: { [REGIAO]: 1 },
     networking: { privateNetworkEndpoint: "presentepesca" },
     env: {
+      // next start escuta essa porta; o domínio do serviço aponta para ela.
+      PORT: "3000",
       // NEXT_PUBLIC_* é embutido no bundle em tempo de build: mudou a URL da
       // API, o PWA precisa de um redeploy.
       NEXT_PUBLIC_SYNC_ENDPOINT: "https://${{api.RAILWAY_PUBLIC_DOMAIN}}",
