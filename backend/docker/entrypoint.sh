@@ -43,9 +43,4 @@ esac
 
 chown -R www-data:www-data var
 
-echo "--- diagnóstico MPM ---" >&2
-grep -rn "LoadModule mpm" /etc/apache2/ 2>/dev/null >&2 || echo "nenhum LoadModule mpm" >&2
-ls -1 /etc/apache2/mods-enabled >&2
-echo "--- fim ---" >&2
-
 exec apache2-foreground
