@@ -148,10 +148,20 @@ railway logs --service api --deployment   # container rodando
 ## Como o container da API sobe
 
 [`backend/Dockerfile`](../backend/Dockerfile) é Apache + PHP 8.4 num processo
-só. Duas armadilhas da imagem base já resolvidas ali: `php:8.4-apache` não traz
-`unzip` nem a extensão zip (sem um dos dois o `composer install` não extrai os
-pacotes) e não pode ficar com `mpm_prefork` e `mpm_event` carregados ao mesmo
-tempo — o Apache morre no boot com *"More than one MPM loaded"*.
+só. Duas armadilhas da imagem base já resolvidas ali:
+
+- `php:8.4-apache` não traz `unzip` nem a extensão zip do PHP, e sem um dos
+  dois o `composer install` não extrai os pacotes dist.
+- O `apt-get` que instala o `unzip` dispara os gatilhos do pacote `apache2` e
+  reativa o `mpm_event`. Com dois MPMs carregados o Apache morre no boot com
+  *"More than one MPM loaded"* e o healthcheck nunca passa. O build remove
+  `mpm_event`/`mpm_worker`, habilita o `mpm_prefork` (que o PHP como módulo
+  exige) e **falha se sobrar mais de um `mpm_*.load`**.
+
+Mesmo assim o container chega no boot com os dois — a limpeza feita no build se
+perde entre o `docker build` e o start no Railway, e é por isso que o
+entrypoint repete a normalização e loga `MPMs habilitados: …` antes de subir o
+Apache. Se um dia essa linha mostrar só o prefork, o passo pode sair.
 
 O [`entrypoint.sh`](../backend/docker/entrypoint.sh) faz, nessa ordem:
 
@@ -162,7 +172,8 @@ O [`entrypoint.sh`](../backend/docker/entrypoint.sh) faz, nessa ordem:
 4. limpa e aquece o cache do Symfony;
 5. cria o diretório das fotos e passa a posse para `www-data` — o ponto de
    montagem do volume nasce do root e o Apache não escreveria nele;
-6. entrega o processo para o `apache2-foreground`.
+6. deixa só o `mpm_prefork` habilitado;
+7. entrega o processo para o `apache2-foreground`.
 
 As migrations rodarem no boot é simples e suficiente para uma réplica só. Se um
 dia precisar escalar, duas réplicas subindo juntas tentariam migrar ao mesmo
